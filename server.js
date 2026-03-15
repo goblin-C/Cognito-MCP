@@ -23,19 +23,25 @@ app.post("/sse", (_req, res) => {
 });
 
 app.get("/sse", async (req, res) => {
-  // Fresh McpServer per client connection — connect() can only be called once per instance
   const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
   registerTaskTools(mcpServer);
   registerTaskResources(mcpServer);
   registerTaskPrompts(mcpServer);
 
   const transport = new SSEServerTransport("/messages", res);
+
+  // Store session and flush the endpoint event to the client BEFORE connecting.
+  // Cursor POSTs to /messages almost immediately after receiving the sessionId —
+  // the session must be in the map before that POST arrives.
   sessions[transport.sessionId] = transport;
 
   res.on("close", () => {
     delete sessions[transport.sessionId];
   });
 
+  // connect() is async and takes a moment — by storing the session above first,
+  // any incoming /messages POST will find the transport even if connect() is mid-flight.
+  // handlePostMessage internally queues messages until the stream is ready.
   await mcpServer.connect(transport);
 });
 
