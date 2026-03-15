@@ -1,11 +1,12 @@
 {
   "name": "cognito-mcp",
   "version": "1.0.0",
-  "description": "A Custom MCP for IaC Cloudformation Generation",
-  "main": "index.js",
   "type": "module",
+  "description": "A Custom MCP for IaC Cloudformation Generation",
+  "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "dev": "node --watch server.js"
   },
   "repository": {
     "type": "git",
@@ -20,6 +21,7 @@
   "homepage": "https://github.com/goblin-C/Cognito-MCP#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
+    "express": "^5.2.1",
     "yaml": "^2.8.2",
     "zod": "^4.3.6"
   }
