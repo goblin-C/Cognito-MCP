@@ -43,7 +43,7 @@ registerTaskPrompts(mcpServer);
 await mcpServer.connect(transport);
 
 // All MCP traffic — init, tool calls, responses — goes through POST /mcp
-app.post("/mcp", requireApiKey, express.raw({ type: "*/*" }), async (req, res) => {
+app.post("/mcp", requireApiKey, express.json(), async (req, res) => {
   await transport.handleRequest(req, res);
 });
 
