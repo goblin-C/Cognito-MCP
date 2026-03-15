@@ -16,6 +16,12 @@ app.use(express.json());
 
 app.get("/health", (_req, res) => res.send("ok"));
 
+// Cursor probes POST /sse first (Streamable HTTP). Return 405 so it
+// immediately falls back to SSE without waiting for a timeout.
+app.post("/sse", (_req, res) => {
+  res.status(405).set("Allow", "GET").json({ error: "Method Not Allowed — use GET /sse for SSE or POST /messages for JSON-RPC" });
+});
+
 app.get("/sse", async (req, res) => {
   // Fresh McpServer per client connection — connect() can only be called once per instance
   const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
