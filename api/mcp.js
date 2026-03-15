@@ -54,13 +54,19 @@ export default async function handler(req, res) {
       }
     );
 
+
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: () => crypto.randomUUID()
+    sessionIdGenerator: () => crypto.randomUUID()
     });
 
     await server.connect(transport);
 
+    console.log("Starting MCP transport");
+
     await transport.handleRequest(req, res);
+
+    console.log("Transport finished");
+
 
   } catch (err) {
 
