@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import express from "express";
+import http from "http";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
@@ -11,27 +11,8 @@ import { registerTaskPrompts }   from "./src/prompts/tasks.js";
 
 const API_KEY = process.env.MCP_API_KEY;
 
-/* ── Auth ────────────────────────────────────────────────── */
+/* ── MCP server + transport ──────────────────────────────── */
 
-function requireApiKey(req, res, next) {
-  if (!API_KEY) return next();
-  const key = req.headers["x-api-key"];
-  if (!key || key !== API_KEY) {
-    return res.status(401).json({ error: "Unauthorized — invalid or missing x-api-key" });
-  }
-  next();
-}
-
-/* ── Express ─────────────────────────────────────────────── */
-
-const app = express();
-
-app.get("/health", (_req, res) => res.send("ok"));
-app.get("/version", (_req, res) => res.json({ version: "4", transport: "streamable-http" }));
-
-/* ── Single MCP endpoint ─────────────────────────────────── */
-
-// One transport instance shared across all sessions
 const transport = new StreamableHTTPServerTransport({
   sessionIdGenerator: () => crypto.randomUUID(),
 });
@@ -42,22 +23,64 @@ registerTaskResources(mcpServer);
 registerTaskPrompts(mcpServer);
 await mcpServer.connect(transport);
 
-// All MCP traffic — init, tool calls, responses — goes through POST /mcp
-app.post("/mcp", requireApiKey, express.json(), async (req, res) => {
-  await transport.handleRequest(req, res);
-});
+/* ── Raw body reader ─────────────────────────────────────── */
 
-// GET /mcp for server-initiated messages (optional but recommended)
-app.get("/mcp", requireApiKey, async (req, res) => {
-  await transport.handleRequest(req, res);
-});
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = "";
+    req.on("data", chunk => data += chunk);
+    req.on("end", () => resolve(data));
+    req.on("error", reject);
+  });
+}
 
-// DELETE /mcp for session cleanup
-app.delete("/mcp", requireApiKey, async (req, res) => {
-  await transport.handleRequest(req, res);
+/* ── Request handler ─────────────────────────────────────── */
+
+const server = http.createServer(async (req, res) => {
+  const { method, url } = req;
+
+  // Health check
+  if (method === "GET" && url === "/health") {
+    res.writeHead(200).end("ok");
+    return;
+  }
+
+  // Auth
+  if (API_KEY && req.headers["x-api-key"] !== API_KEY) {
+    res.writeHead(401, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "Unauthorized — invalid or missing x-api-key" }));
+    return;
+  }
+
+  // MCP endpoint
+  if (url === "/mcp") {
+    if (method === "POST") {
+      try {
+        const raw = await readBody(req);
+        req.body = JSON.parse(raw);
+      } catch {
+        res.writeHead(400, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error: Invalid JSON" }, id: null }));
+        return;
+      }
+      await transport.handleRequest(req, res);
+      return;
+    }
+
+    if (method === "GET" || method === "DELETE") {
+      await transport.handleRequest(req, res);
+      return;
+    }
+
+    res.writeHead(405, { Allow: "GET, POST, DELETE" }).end();
+    return;
+  }
+
+  // 404
+  res.writeHead(404).end();
 });
 
 /* ── Start ───────────────────────────────────────────────── */
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => console.log(`MCP cognito-mcp running on port ${PORT}`));
+server.listen(PORT, () => console.log(`MCP cognito-mcp running on port ${PORT}`));
