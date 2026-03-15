@@ -1,76 +1,163 @@
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
-export default async function handler(req, res) {
+/* ---------------- TASK STORE ---------------- */
 
-  console.log("==== MCP REQUEST RECEIVED ====");
+let tasks = [];
 
-  const body =
-    typeof req.body === "string"
-      ? JSON.parse(req.body)
-      : req.body;
+/* ---------------- MCP SERVER ---------------- */
 
-  console.log("Body:", body);
+const server = new McpServer({
+  name: "Task MCP Server",
+  version: "1.0.0"
+});
 
-  // ---- tool implementation ----
+/* ---------------- TOOLS ---------------- */
 
-  const helloTool = async ({ name }) => {
+server.tool(
+  "addTask",
+  "Add a new task",
+  {
+    title: z.string()
+  },
+  async ({ title }) => {
+
+    const task = {
+      id: crypto.randomUUID(),
+      title
+    };
+
+    tasks.push(task);
+
     return {
       content: [
         {
           type: "text",
-          text: `Hello ${name}`
+          text: JSON.stringify(task)
         }
       ]
     };
-  };
-
-  // ---- tools/list ----
-
-  if (body.method === "tools/list") {
-
-    return res.json({
-      jsonrpc: "2.0",
-      id: body.id,
-      result: {
-        tools: [
-          {
-            name: "hello",
-            description: "Test MCP tool",
-            inputSchema: {
-              type: "object",
-              properties: {
-                name: { type: "string" }
-              }
-            }
-          }
-        ]
-      }
-    });
-
   }
+);
 
-  // ---- tools/call ----
+server.tool(
+  "listTasks",
+  "List all tasks",
+  {},
+  async () => {
 
-  if (body.method === "tools/call") {
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(tasks)
+        }
+      ]
+    };
+  }
+);
 
-    const { name, arguments: args } = body.params;
+server.tool(
+  "removeTask",
+  "Remove task",
+  {
+    id: z.string()
+  },
+  async ({ id }) => {
 
-    if (name === "hello") {
+    tasks = tasks.filter(t => t.id !== id);
 
-      const result = await helloTool(args);
+    return {
+      content: [{ type: "text", text: "Task removed" }]
+    };
+  }
+);
 
-      return res.json({
-        jsonrpc: "2.0",
-        id: body.id,
-        result
-      });
+server.tool(
+  "updateTask",
+  "Update task",
+  {
+    id: z.string(),
+    title: z.string()
+  },
+  async ({ id, title }) => {
+
+    const task = tasks.find(t => t.id === id);
+
+    if (task) task.title = title;
+
+    return {
+      content: [{ type: "text", text: "Task updated" }]
+    };
+  }
+);
+
+/* ---------------- RESOURCES ---------------- */
+
+server.resource(
+  "tasks",
+  "tasks://all",
+  async () => {
+
+    return {
+      contents: [
+        {
+          uri: "tasks://all",
+          text: JSON.stringify(tasks)
+        }
+      ]
+    };
+  }
+);
+
+/* ---------------- PROMPTS ---------------- */
+
+server.prompt(
+  "summarizeTasks",
+  "Summarize all tasks",
+  async () => {
+
+    return {
+      messages: [
+        {
+          role: "user",
+          content: `Summarize these tasks: ${JSON.stringify(tasks)}`
+        }
+      ]
+    };
+  }
+);
+
+/* ---------------- VERCEL HANDLER ---------------- */
+
+export default async function handler(req, res) {
+
+  try {
+
+    if (req.method === "GET") {
+
+      const response = await server.handleRequest();
+
+      return res.status(200).json(response);
 
     }
 
-  }
+    if (req.method === "POST") {
 
-  res.status(400).json({
-    error: "Unknown method"
-  });
+      const response = await server.handleRequest(req.body);
+
+      return res.status(200).json(response);
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      error: error.message
+    });
+
+  }
 
 }
