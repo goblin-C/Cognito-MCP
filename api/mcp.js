@@ -5,15 +5,32 @@ import { z } from "zod";
 
 export default async function handler(req, res) {
 
+  console.log("==== MCP REQUEST RECEIVED ====");
+  console.log("Method:", req.method);
+  console.log("Headers:", req.headers);
+
   try {
 
-    // Create server per request
+    const body =
+      typeof req.body === "string"
+        ? JSON.parse(req.body)
+        : req.body;
+
+    console.log("Body:", body);
+
+    // Quick debug endpoint
+    if (body?.debug === true) {
+      return res.status(200).json({
+        message: "Debug endpoint working",
+        receivedBody: body
+      });
+    }
+
     const server = new McpServer({
       name: "cognito-configurator",
       version: "1.0.0"
     });
 
-    // Register tool
     server.tool(
       "hello",
       {
@@ -22,14 +39,19 @@ export default async function handler(req, res) {
           name: z.string()
         }
       },
-      async ({ name }) => ({
-        content: [
-          {
-            type: "text",
-            text: `Hello ${name}`
-          }
-        ]
-      })
+      async ({ name }) => {
+
+        console.log("Tool called with:", name);
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Hello ${name}`
+            }
+          ]
+        };
+      }
     );
 
     const transport = new StreamableHTTPServerTransport({
@@ -42,10 +64,11 @@ export default async function handler(req, res) {
 
   } catch (err) {
 
+    console.error("MCP ERROR:", err);
+
     res.status(500).json({
       error: err.message
     });
 
   }
-
 }
