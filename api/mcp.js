@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 import { generateCognitoYaml } from "../lib/generateCognitoYaml.js";
 
@@ -40,22 +41,11 @@ server.tool(
 
 export default async function handler(req, res) {
 
-  try {
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => crypto.randomUUID()
+  });
 
-    const body =
-      typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body;
+  await server.connect(transport);
 
-    const response = await server.handle(body);
-
-    res.status(200).json(response);
-
-  } catch (err) {
-
-    res.status(500).json({
-      error: err.message
-    });
-
-  }
+  await transport.handleRequest(req, res);
 }
