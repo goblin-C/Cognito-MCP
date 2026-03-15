@@ -2,7 +2,6 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import http from "http";
-import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
@@ -23,17 +22,6 @@ registerTaskTools(mcpServer);
 registerTaskResources(mcpServer);
 registerTaskPrompts(mcpServer);
 await mcpServer.connect(transport);
-
-/* ── Raw body reader ─────────────────────────────────────── */
-
-function readBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", chunk => data += chunk);
-    req.on("end", () => resolve(data));
-    req.on("error", reject);
-  });
-}
 
 /* ── Request handler ─────────────────────────────────────── */
 
@@ -56,20 +44,7 @@ const server = http.createServer(async (req, res) => {
   // MCP endpoint
   if (url === "/mcp") {
     if (method === "POST") {
-      try {
-        const raw = await readBody(req);
-        // SDK reads the stream directly — replay the consumed body as a new readable
-        const readable = Readable.from([raw]);
-        const fakeReq = Object.assign(readable, {
-          headers: req.headers,
-          method:  req.method,
-          url:     req.url,
-        });
-        await transport.handleRequest(fakeReq, res);
-      } catch (e) {
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error: Invalid JSON" }, id: null }));
-      }
+      await transport.handleRequest(req, res);
       return;
     }
 
