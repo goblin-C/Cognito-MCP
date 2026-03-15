@@ -12,14 +12,14 @@ import { registerTaskPrompts }   from "./src/prompts/tasks.js";
 const sessions = {};
 
 const app = express();
-app.use(express.json());
+
+// Do NOT add express.json() globally — it consumes the request body stream
+// before the MCP SDK can read it in /messages, causing "stream is not readable"
 
 app.get("/health", (_req, res) => res.send("ok"));
 
-// Cursor probes POST /sse first (Streamable HTTP). Return 405 so it
-// immediately falls back to SSE without waiting for a timeout.
 app.post("/sse", (_req, res) => {
-  res.status(405).set("Allow", "GET").json({ error: "Method Not Allowed — use GET /sse for SSE or POST /messages for JSON-RPC" });
+  res.status(405).set("Allow", "GET").json({ error: "Method Not Allowed — use GET /sse" });
 });
 
 app.get("/sse", async (req, res) => {
@@ -29,23 +29,17 @@ app.get("/sse", async (req, res) => {
   registerTaskPrompts(mcpServer);
 
   const transport = new SSEServerTransport("/messages", res);
-
-  // Store session and flush the endpoint event to the client BEFORE connecting.
-  // Cursor POSTs to /messages almost immediately after receiving the sessionId —
-  // the session must be in the map before that POST arrives.
   sessions[transport.sessionId] = transport;
 
   res.on("close", () => {
     delete sessions[transport.sessionId];
   });
 
-  // connect() is async and takes a moment — by storing the session above first,
-  // any incoming /messages POST will find the transport even if connect() is mid-flight.
-  // handlePostMessage internally queues messages until the stream is ready.
   await mcpServer.connect(transport);
 });
 
-app.post("/messages", async (req, res) => {
+// express.raw lets the SDK read the body stream itself — do not use express.json() here
+app.post("/messages", express.raw({ type: "*/*" }), async (req, res) => {
   const { sessionId } = req.query;
   const transport = sessions[sessionId];
 
