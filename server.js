@@ -23,6 +23,10 @@ registerTaskResources(mcpServer);
 registerTaskPrompts(mcpServer);
 await mcpServer.connect(transport);
 
+/* ── Session store ───────────────────────────────────────── */
+
+const sessions = new Map(); // sessionId → { transport, mcpServer }
+
 /* ── Request handler ─────────────────────────────────────── */
 
 const server = http.createServer(async (req, res) => {
@@ -42,13 +46,32 @@ const server = http.createServer(async (req, res) => {
   }
 
   // MCP endpoint
-  if (url === "/mcp") {
-    if (method === "POST") {
-      await transport.handleRequest(req, res);
-      return;
+  if (url === "/mcp" && method === "POST") {
+    const sessionId = req.headers["mcp-session-id"];
+
+    let transport;
+
+    if (sessionId && sessions.has(sessionId)) {
+      // Existing session — reuse transport
+      transport = sessions.get(sessionId).transport;
+    } else {
+      // New session — fresh transport + server per client
+      transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => crypto.randomUUID(),
+      });
+      const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
+      registerTaskTools(mcpServer);
+      registerTaskResources(mcpServer);
+      registerTaskPrompts(mcpServer);
+      await mcpServer.connect(transport);
+
+      // Store once the session ID is assigned (after connect)
+      if (transport.sessionId) {
+        sessions.set(transport.sessionId, { transport, mcpServer });
+      }
     }
 
-    res.writeHead(405, { Allow: "POST" }).end();
+    await transport.handleRequest(req, res);
     return;
   }
 
