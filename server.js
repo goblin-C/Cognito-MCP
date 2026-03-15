@@ -57,8 +57,11 @@ const server = http.createServer(async (req, res) => {
     if (method === "POST") {
       try {
         const raw = await readBody(req);
+        console.log("raw body:", raw);
+        console.log("content-type:", req.headers["content-type"]);
         req.body = JSON.parse(raw);
-      } catch {
+        console.log("parsed body:", req.body);
+      } catch (e) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error: Invalid JSON" }, id: null }));
         return;
@@ -67,12 +70,7 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if (method === "GET" || method === "DELETE") {
-      await transport.handleRequest(req, res);
-      return;
-    }
-
-    res.writeHead(405, { Allow: "GET, POST, DELETE" }).end();
+    res.writeHead(405, { Allow: "POST" }).end();
     return;
   }
 
