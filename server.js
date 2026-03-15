@@ -3,52 +3,61 @@ dotenv.config();
 
 import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
 import { registerTaskTools }     from "./src/tools/tasks.js";
 import { registerTaskResources } from "./src/resources/tasks.js";
 import { registerTaskPrompts }   from "./src/prompts/tasks.js";
 
-const sessions = {};
+const API_KEY = process.env.MCP_API_KEY;
+
+/* ── Auth ────────────────────────────────────────────────── */
+
+function requireApiKey(req, res, next) {
+  if (!API_KEY) return next();
+  const key = req.headers["x-api-key"];
+  if (!key || key !== API_KEY) {
+    return res.status(401).json({ error: "Unauthorized — invalid or missing x-api-key" });
+  }
+  next();
+}
+
+/* ── Express ─────────────────────────────────────────────── */
 
 const app = express();
 
-// Do NOT add express.json() globally — it consumes the request body stream
-// before the MCP SDK can read it in /messages, causing "stream is not readable"
-
 app.get("/health", (_req, res) => res.send("ok"));
+app.get("/version", (_req, res) => res.json({ version: "4", transport: "streamable-http" }));
 
-app.post("/sse", (_req, res) => {
-  res.status(405).set("Allow", "GET").json({ error: "Method Not Allowed — use GET /sse" });
+/* ── Single MCP endpoint ─────────────────────────────────── */
+
+// One transport instance shared across all sessions
+const transport = new StreamableHTTPServerTransport({
+  sessionIdGenerator: () => crypto.randomUUID(),
 });
 
-app.get("/sse", async (req, res) => {
-  const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
-  registerTaskTools(mcpServer);
-  registerTaskResources(mcpServer);
-  registerTaskPrompts(mcpServer);
+const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
+registerTaskTools(mcpServer);
+registerTaskResources(mcpServer);
+registerTaskPrompts(mcpServer);
+await mcpServer.connect(transport);
 
-  const transport = new SSEServerTransport("/messages", res);
-  sessions[transport.sessionId] = transport;
-
-  res.on("close", () => {
-    delete sessions[transport.sessionId];
-  });
-
-  await mcpServer.connect(transport);
+// All MCP traffic — init, tool calls, responses — goes through POST /mcp
+app.post("/mcp", requireApiKey, express.raw({ type: "*/*" }), async (req, res) => {
+  await transport.handleRequest(req, res);
 });
 
-// express.raw lets the SDK read the body stream itself — do not use express.json() here
-app.post("/messages", express.raw({ type: "*/*" }), async (req, res) => {
-  const { sessionId } = req.query;
-  const transport = sessions[sessionId];
-
-  if (!transport) {
-    return res.status(400).json({ error: "Unknown sessionId" });
-  }
-
-  await transport.handlePostMessage(req, res);
+// GET /mcp for server-initiated messages (optional but recommended)
+app.get("/mcp", requireApiKey, async (req, res) => {
+  await transport.handleRequest(req, res);
 });
+
+// DELETE /mcp for session cleanup
+app.delete("/mcp", requireApiKey, async (req, res) => {
+  await transport.handleRequest(req, res);
+});
+
+/* ── Start ───────────────────────────────────────────────── */
 
 const PORT = process.env.PORT || 8000;
 app.listen(PORT, () => console.log(`MCP cognito-mcp running on port ${PORT}`));
