@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import http from "http";
+import { Readable } from "stream";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 
@@ -57,16 +58,18 @@ const server = http.createServer(async (req, res) => {
     if (method === "POST") {
       try {
         const raw = await readBody(req);
-        console.log("raw body:", raw);
-        console.log("content-type:", req.headers["content-type"]);
-        req.body = JSON.parse(raw);
-        console.log("parsed body:", req.body);
+        // SDK reads the stream directly — replay the consumed body as a new readable
+        const readable = Readable.from([raw]);
+        const fakeReq = Object.assign(readable, {
+          headers: req.headers,
+          method:  req.method,
+          url:     req.url,
+        });
+        await transport.handleRequest(fakeReq, res);
       } catch (e) {
         res.writeHead(400, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ jsonrpc: "2.0", error: { code: -32700, message: "Parse error: Invalid JSON" }, id: null }));
-        return;
       }
-      await transport.handleRequest(req, res);
       return;
     }
 
