@@ -1,5 +1,7 @@
 
 // eslint-disable-next-line @typescript-eslint/no-deprecated
+import dotenv from "dotenv";
+dotenv.config();
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 
 import express from "express";
@@ -55,5 +57,5 @@ app.post("/messages", async (req, res) => {
 
 /* ── Start ───────────────────────────────────────────────── */
 
-const PORT =  8000;
-app.listen(PORT, () => console.log(`MCP cognito-mcp running on port ${PORT}`));
+const PORT = process.env.PORT || 8000;
+app.listen(PORT, () => console.log(`MCP task-server running on port ${PORT}`));
