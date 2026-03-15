@@ -1,80 +1,79 @@
-import crypto from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
 
 export default async function handler(req, res) {
 
   console.log("==== MCP REQUEST RECEIVED ====");
-  console.log("Method:", req.method);
-  console.log("Headers:", req.headers);
 
-  try {
+  const body =
+    typeof req.body === "string"
+      ? JSON.parse(req.body)
+      : req.body;
 
-    const body =
-      typeof req.body === "string"
-        ? JSON.parse(req.body)
-        : req.body;
+  console.log("Body:", body);
 
-    console.log("Body:", body);
+  const server = new McpServer({
+    name: "cognito-configurator",
+    version: "1.0.0"
+  });
 
-    // Quick debug endpoint
-    if (body?.debug === true) {
-      return res.status(200).json({
-        message: "Debug endpoint working",
-        receivedBody: body
-      });
-    }
-
-    const server = new McpServer({
-      name: "cognito-configurator",
-      version: "1.0.0"
-    });
-
-    server.tool(
-      "hello",
-      {
-        description: "Test MCP tool",
-        inputSchema: {
-          name: z.string()
-        }
-      },
-      async ({ name }) => {
-
-        console.log("Tool called with:", name);
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Hello ${name}`
-            }
-          ]
-        };
+  server.tool(
+    "hello",
+    {
+      description: "Test MCP tool",
+      inputSchema: {
+        name: z.string()
       }
-    );
+    },
+    async ({ name }) => ({
+      content: [
+        {
+          type: "text",
+          text: `Hello ${name}`
+        }
+      ]
+    })
+  );
 
+  // JSON-RPC handling manually
 
-    const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID()
-    });
+  if (body.method === "tools/list") {
 
-    await server.connect(transport);
-
-    console.log("Starting MCP transport");
-
-    await transport.handleRequest(req, res);
-
-    console.log("Transport finished");
-
-
-  } catch (err) {
-
-    console.error("MCP ERROR:", err);
-
-    res.status(500).json({
-      error: err.message
+    return res.json({
+      jsonrpc: "2.0",
+      id: body.id,
+      result: {
+        tools: [
+          {
+            name: "hello",
+            description: "Test MCP tool"
+          }
+        ]
+      }
     });
 
   }
+
+  if (body.method === "tools/call") {
+
+    const { name, arguments: args } = body.params;
+
+    if (name === "hello") {
+
+      const result = await server._tools.get("hello").handler(args);
+
+      return res.json({
+        jsonrpc: "2.0",
+        id: body.id,
+        result
+      });
+
+    }
+
+  }
+
+  res.status(400).json({
+    error: "Unknown method"
+  });
+
 }
