@@ -1,4 +1,3 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 export default async function handler(req, res) {
@@ -12,30 +11,20 @@ export default async function handler(req, res) {
 
   console.log("Body:", body);
 
-  const server = new McpServer({
-    name: "cognito-configurator",
-    version: "1.0.0"
-  });
+  // ---- tool implementation ----
 
-  server.tool(
-    "hello",
-    {
-      description: "Test MCP tool",
-      inputSchema: {
-        name: z.string()
-      }
-    },
-    async ({ name }) => ({
+  const helloTool = async ({ name }) => {
+    return {
       content: [
         {
           type: "text",
           text: `Hello ${name}`
         }
       ]
-    })
-  );
+    };
+  };
 
-  // JSON-RPC handling manually
+  // ---- tools/list ----
 
   if (body.method === "tools/list") {
 
@@ -46,7 +35,13 @@ export default async function handler(req, res) {
         tools: [
           {
             name: "hello",
-            description: "Test MCP tool"
+            description: "Test MCP tool",
+            inputSchema: {
+              type: "object",
+              properties: {
+                name: { type: "string" }
+              }
+            }
           }
         ]
       }
@@ -54,13 +49,15 @@ export default async function handler(req, res) {
 
   }
 
+  // ---- tools/call ----
+
   if (body.method === "tools/call") {
 
     const { name, arguments: args } = body.params;
 
     if (name === "hello") {
 
-      const result = await server._tools.get("hello").handler(args);
+      const result = await helloTool(args);
 
       return res.json({
         jsonrpc: "2.0",
