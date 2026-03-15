@@ -11,18 +11,6 @@ import { registerTaskPrompts }   from "./src/prompts/tasks.js";
 
 const API_KEY = process.env.MCP_API_KEY;
 
-/* ── MCP server + transport ──────────────────────────────── */
-
-const transport = new StreamableHTTPServerTransport({
-  sessionIdGenerator: () => crypto.randomUUID(),
-});
-
-const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
-registerTaskTools(mcpServer);
-registerTaskResources(mcpServer);
-registerTaskPrompts(mcpServer);
-await mcpServer.connect(transport);
-
 /* ── Session store ───────────────────────────────────────── */
 
 const sessions = new Map(); // sessionId → { transport, mcpServer }
@@ -57,18 +45,17 @@ const server = http.createServer(async (req, res) => {
     } else {
       // New session — fresh transport + server per client
       transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => crypto.randomUUID(),
+        sessionIdGenerator: () => {
+          const sessionId = crypto.randomUUID();
+          sessions.set(sessionId, { transport });
+          return sessionId;
+        },
       });
       const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
       registerTaskTools(mcpServer);
       registerTaskResources(mcpServer);
       registerTaskPrompts(mcpServer);
       await mcpServer.connect(transport);
-
-      // Store once the session ID is assigned (after connect)
-      if (transport.sessionId) {
-        sessions.set(transport.sessionId, { transport, mcpServer });
-      }
     }
 
     await transport.handleRequest(req, res);
