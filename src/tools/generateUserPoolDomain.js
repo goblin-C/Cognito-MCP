@@ -1,9 +1,21 @@
 import { z } from "zod";
 import { buildYaml } from '../utils/helpers.js'
 
+/**
+ * Tool: auth.configure-domain
+ *
+ * Collects AWS Cognito User Pool Domain configuration from the developer and
+ * returns a CloudFormation YAML string (AWS::Cognito::UserPoolDomain).
+ *
+ * Supports both Cognito-prefixed domains and custom domains (via ACM certificate).
+ *
+ * Output: cognito-userpool-domain.yaml
+ * Next step: run auth.plan to validate and preview all changes before deploying
+ */
+
 export function registerUserPoolDomainTool(server) {
   server.tool(
-    "auth:configure-domain",
+    "auth.configure-domain",
     "Configure an AWS Cognito User Pool Domain and return a CloudFormation YAML",
     {
       Domain: z.string().describe("Domain prefix for the Cognito hosted UI (e.g. 'myapp' → myapp.auth.us-east-1.amazoncognito.com), or full custom domain if using ACM certificate"),

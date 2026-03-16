@@ -1,9 +1,22 @@
 import { z } from "zod";
 import { buildYaml } from '../utils/helpers.js'
 
+/**
+ * Tool: auth.configure-client
+ *
+ * Collects AWS Cognito User Pool Client configuration from the developer and
+ * returns a CloudFormation YAML string (AWS::Cognito::UserPoolClient).
+ *
+ * Only fields explicitly provided are included in the output — no defaults
+ * or empty values are written to the template.
+ *
+ * Output: cognito-userpool-client.yaml
+ * Next step: run auth.configure-domain, then auth.plan
+ */
+
 export function registerUserClientConfigTool(server) {
   server.tool(
-    "auth:configure-client",
+    "auth.configure-client",
     "Configure an AWS Cognito User Pool Client and return a CloudFormation YAML",
     {
       // ── Core
