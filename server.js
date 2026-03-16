@@ -15,7 +15,7 @@ const server = http.createServer(async (req, res) => {
 
   if (!authMiddleware(req, res)) return;
 
-  if (url === "/mcp" && method === "POST") {
+  if (url === "/mcp" && ["GET", "POST", "DELETE"].includes(method)) {
     await mcpRoute(req, res);
     return;
   }
