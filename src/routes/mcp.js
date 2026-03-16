@@ -5,6 +5,7 @@ import { sessions } from "../sessions/sessionStore.js";
 // Tools import
 import { registerUserPoolConfigTool } from "../tools/generateUserPoolConfig.js";
 import { registerUserClientConfigTool } from "../tools/generateUserClientConfig.js";
+import { registerUserPoolDomainTool } from "../tools/generateUserPoolDomain.js";
 
 export async function mcpRoute(req, res) {
   const sessionId = req.headers["mcp-session-id"];
@@ -28,6 +29,7 @@ export async function mcpRoute(req, res) {
     // Register the Tool so that MCP can find this tool
     registerUserPoolConfigTool(mcpServer);
     registerUserClientConfigTool(mcpServer);
+    registerUserPoolDomainTool(mcpServer);
     
     await mcpServer.connect(transport);
   }
