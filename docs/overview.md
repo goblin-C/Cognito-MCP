@@ -46,10 +46,6 @@ Resources:
 
 Fields are only emitted when explicitly provided — there are no hidden defaults injected into the template.
 
-## Session management
-
-Each HTTP connection to `/mcp` creates an isolated MCP server instance with its own session ID (returned in the `mcp-session-id` response header). Subsequent requests from the same client reuse the session. Sessions are held in memory; restarting the server clears all sessions.
-
 ## Authentication
 
-If the `MCP_API_KEY` environment variable is set, all requests to `/mcp` must include a matching `x-api-key` header. Requests without the key or with a wrong key receive a `401` response. Authentication is skipped entirely when `MCP_API_KEY` is not set.
+Access to the server can be restricted with an API key. When the server is protected, MCP clients must include an `x-api-key` header in every request. See [Usage](usage.md) for how to configure this in your MCP client.
