@@ -3,9 +3,10 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { sessions } from "../sessions/sessionStore.js";
 
 // Tools import
-import { registerUserPoolConfigTool } from "../tools/generateUserPoolConfig.js";
-import { registerUserClientConfigTool } from "../tools/generateUserClientConfig.js";
-import { registerUserPoolDomainTool } from "../tools/generateUserPoolDomain.js";
+import { registerUserPoolDescribeTool, registerUserPoolConfigTool } from "../tools/generateUserPoolConfig.js";
+import { registerUserClientDescribeTool, registerUserClientConfigTool } from "../tools/generateUserClientConfig.js";
+import { registerUserPoolDomainDescribeTool, registerUserPoolDomainTool } from "../tools/generateUserPoolDomain.js";
+import { registerHelpTool } from "../tools/help.js";
 
 export async function mcpRoute(req, res) {
   const sessionId = req.headers["mcp-session-id"];
@@ -27,10 +28,17 @@ export async function mcpRoute(req, res) {
     const mcpServer = new McpServer({ name: "cognito-mcp", version: "1.0.0" });
 
     // Register the Tool so that MCP can find this tool
+    registerUserPoolDescribeTool(mcpServer);
     registerUserPoolConfigTool(mcpServer);
+
+    registerUserClientDescribeTool(mcpServer);
     registerUserClientConfigTool(mcpServer);
-    registerUserPoolDomainTool(mcpServer);
     
+    registerUserPoolDomainDescribeTool(mcpServer);
+    registerUserPoolDomainTool(mcpServer);
+
+    registerHelpTool(mcpServer);
+
     await mcpServer.connect(transport);
   }
 
