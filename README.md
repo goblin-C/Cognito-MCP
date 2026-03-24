@@ -50,7 +50,7 @@ If `MCP_API_KEY` is set, include the key as a header:
     "cognito": {
       "url": "https://your-cognito-mcp.vercel.app/mcp",
       "headers": {
-        "x-api-key": "your-secret-key"
+        "x-api-key": "your-secret-key-here"
       }
     }
   }

@@ -7,6 +7,10 @@ import { sessions } from "../sessions/sessionStore.js";
 import { registerUserPoolDescribeTool, registerUserPoolConfigTool } from "../tools/generateUserPoolConfig.js";
 import { registerUserClientDescribeTool, registerUserClientConfigTool } from "../tools/generateUserClientConfig.js";
 import { registerUserPoolDomainDescribeTool, registerUserPoolDomainTool } from "../tools/generateUserPoolDomain.js";
+import { registerIdentityProviderDescribeTool, registerIdentityProviderConfigTool } from "../tools/generateIdentityProvider.js";
+import { registerSetupBasicTool } from "../tools/setupBasicAuth.js";
+import { registerModifyConfigTool } from "../tools/modifyConfig.js";
+import { registerInteractivePoolTool, registerInteractiveClientTool, registerInteractiveDomainTool } from "../tools/interactiveSetup.js";
 import { registerHelpTool } from "../tools/help.js";
 
 export async function mcpRoute(req, res) {
@@ -37,6 +41,16 @@ export async function mcpRoute(req, res) {
     
     registerUserPoolDomainDescribeTool(mcpServer);
     registerUserPoolDomainTool(mcpServer);
+
+    registerIdentityProviderDescribeTool(mcpServer);
+    registerIdentityProviderConfigTool(mcpServer);
+
+    registerSetupBasicTool(mcpServer);
+    registerModifyConfigTool(mcpServer);
+
+    registerInteractivePoolTool(mcpServer);
+    registerInteractiveClientTool(mcpServer);
+    registerInteractiveDomainTool(mcpServer);
 
     registerHelpTool(mcpServer);
 
